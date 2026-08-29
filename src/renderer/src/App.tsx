@@ -1,15 +1,7 @@
 import { Button, Empty, Layout, Space, Tabs, Tag, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { ReactElement } from 'react';
-import type {
-  AppLocale,
-  Endpoint,
-  LoadedSpec,
-  MockMap,
-  MockResponse,
-  RequestLogEntry,
-  ServerStatus,
-} from '../../shared/types';
+import type { AppLocale, MockResponse } from '../../shared/types';
 import { ErrorState } from './components/ErrorState';
 import { GenerationControls } from './components/GenerationControls';
 import { MockEditor } from './components/MockEditor';
@@ -17,109 +9,77 @@ import { MockTransfer } from './components/MockTransfer';
 import { RequestLog } from './components/RequestLog';
 import { RouteSidebar } from './components/RouteSidebar';
 import { ServerControls } from './components/ServerControls';
-
-type AppState = {
-  readonly version?: string;
-  readonly endpoints: readonly Endpoint[];
-  readonly specs: readonly LoadedSpec[];
-  readonly serverStatus: ServerStatus;
-  readonly mocks: readonly MockMap[];
-  readonly selected?: Endpoint;
-  readonly requestLog: readonly RequestLogEntry[];
-  readonly mockSeed?: number;
-  readonly locale: AppLocale;
-  readonly error?: string;
-  readonly loading: boolean;
-};
-
-const initialState: AppState = {
-  endpoints: [],
-  specs: [],
-  serverStatus: { state: 'stopped' },
-  mocks: [],
-  requestLog: [],
-  locale: 'en',
-  loading: false,
-};
+import { useAppStore } from './store/useAppStore';
 
 export function App(): ReactElement {
-  const [state, setState] = useState<AppState>(initialState);
+  const version = useAppStore((state) => state.version);
+  const endpoints = useAppStore((state) => state.endpoints);
+  const specs = useAppStore((state) => state.specs);
+  const serverStatus = useAppStore((state) => state.serverStatus);
+  const mocks = useAppStore((state) => state.mocks);
+  const selected = useAppStore((state) => state.selected);
+  const requestLog = useAppStore((state) => state.requestLog);
+  const mockSeed = useAppStore((state) => state.mockSeed);
+  const locale = useAppStore((state) => state.locale);
+  const error = useAppStore((state) => state.error);
+  const loading = useAppStore((state) => state.loading);
+  const setVersion = useAppStore((state) => state.setVersion);
+  const setServerStatus = useAppStore((state) => state.setServerStatus);
+  const setRequestLog = useAppStore((state) => state.setRequestLog);
+  const setSettings = useAppStore((state) => state.setSettings);
+  const setLoading = useAppStore((state) => state.setLoading);
+  const setError = useAppStore((state) => state.setError);
+  const loadWorkspace = useAppStore((state) => state.loadWorkspace);
+  const selectEndpoint = useAppStore((state) => state.selectEndpoint);
+  const replaceMock = useAppStore((state) => state.replaceMock);
 
   useEffect(() => {
     void window.reflect.getAppVersion().then((result) => {
-      if (result.ok) setState((current) => ({ ...current, version: result.value }));
+      if (result.ok) setVersion(result.value);
     });
     void window.reflect.getServerStatus().then((result) => {
-      if (result.ok) setState((current) => ({ ...current, serverStatus: result.value }));
+      if (result.ok) setServerStatus(result.value);
     });
     void window.reflect.getSettings().then((result) => {
       if (result.ok) {
-        setState((current) => ({
-          ...current,
-          mockSeed: result.value.mockSeed,
-          locale: result.value.locale ?? 'en',
-        }));
+        setSettings(result.value);
       }
     });
     const refreshRequestLog = (): void => {
       void window.reflect.listRequestLog().then((result) => {
-        if (result.ok) setState((current) => ({ ...current, requestLog: result.value }));
+        if (result.ok) setRequestLog(result.value);
       });
     };
     refreshRequestLog();
     const interval = window.setInterval(refreshRequestLog, 1_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [setRequestLog, setServerStatus, setSettings, setVersion]);
 
   async function openSpec(): Promise<void> {
-    setState((current) => ({ ...current, loading: true, error: undefined }));
+    setLoading(true);
+    setError(undefined);
     const result = await window.reflect.openSpec();
     const workspace = result.ok ? result.value : undefined;
     if (!workspace) {
-      setState((current) => ({
-        ...current,
-        loading: false,
-        error: result.ok ? undefined : result.error.message,
-      }));
+      setLoading(false);
+      setError(result.ok ? undefined : result.error.message);
       return;
     }
     const mocks = await window.reflect.listMocks();
-    setState((current) => ({
-      ...current,
-      loading: false,
-      endpoints: workspace.specs.flatMap((spec) => spec.endpoints),
-      specs: workspace.specs,
-      mocks: mocks.ok ? mocks.value : [],
-      selected: workspace.specs.flatMap((spec) => spec.endpoints)[0],
-    }));
-  }
-
-  function selectEndpoint(endpoint: Endpoint): void {
-    setState((current) => ({
-      ...current,
-      selected: endpoint,
-      error: undefined,
-    }));
+    loadWorkspace(workspace, mocks.ok ? mocks.value : []);
   }
 
   async function saveMock(response: MockResponse): Promise<string | undefined> {
-    if (!state.selected) return 'Select an endpoint before saving.';
+    if (!selected) return 'Select an endpoint before saving.';
 
     const result = await window.reflect.saveMock({
-      path: state.selected.path,
-      method: state.selected.method,
+      path: selected.path,
+      method: selected.method,
       response,
     });
     if (!result.ok) return result.error.message;
 
-    setState((current) => ({
-      ...current,
-      mocks: [
-        ...current.mocks.filter((mockMap) => mockMap.specPath !== result.value.specPath),
-        result.value,
-      ],
-      error: undefined,
-    }));
+    replaceMock(result.value);
     return undefined;
   }
 
@@ -127,7 +87,7 @@ export function App(): ReactElement {
     const result = await window.reflect.saveMockSeed(seed);
     if (!result.ok) return result.error.message;
 
-    setState((current) => ({ ...current, mockSeed: result.value.mockSeed }));
+    setSettings(result.value);
     return undefined;
   }
 
@@ -135,7 +95,7 @@ export function App(): ReactElement {
     const result = await window.reflect.saveAppLocale(locale);
     if (!result.ok) return result.error.message;
 
-    setState((current) => ({ ...current, locale: result.value.locale ?? 'en' }));
+    setSettings(result.value);
     return undefined;
   }
 
@@ -144,45 +104,42 @@ export function App(): ReactElement {
       <Layout.Header className="app-header">
         <div>
           <Typography.Title level={3}>Reflect</Typography.Title>
-          <Typography.Text type="secondary">OpenAPI mock workspace {state.version}</Typography.Text>
+          <Typography.Text type="secondary">OpenAPI mock workspace {version}</Typography.Text>
         </div>
         <Space wrap>
-          <Tag color={state.serverStatus.state === 'running' ? 'green' : 'default'}>
-            {state.serverStatus.state}
-            {state.serverStatus.port ? ` :${state.serverStatus.port}` : ''}
+          <Tag color={serverStatus.state === 'running' ? 'green' : 'default'}>
+            {serverStatus.state}
+            {serverStatus.port ? ` :${serverStatus.port}` : ''}
           </Tag>
-          <Button type="primary" loading={state.loading} onClick={() => void openSpec()}>
+          <Button type="primary" loading={loading} onClick={() => void openSpec()}>
             Add specifications
           </Button>
         </Space>
       </Layout.Header>
       <Layout.Content className="app-content">
-        {state.error ? <ErrorState message={state.error} onRetry={() => void openSpec()} /> : null}
+        {error ? <ErrorState message={error} onRetry={() => void openSpec()} /> : null}
         <Tabs
           items={[
             {
               key: 'routes',
               label: 'Routes',
               children:
-                state.endpoints.length > 0 ? (
+                endpoints.length > 0 ? (
                   <div className="route-workspace">
                     <RouteSidebar
-                      endpoints={state.endpoints}
-                      selected={state.selected}
+                      endpoints={endpoints}
+                      selected={selected}
                       onSelect={selectEndpoint}
                     />
                     <main className="route-editor">
-                      {state.selected ? (
+                      {selected ? (
                         <MockEditor
-                          endpoint={state.selected}
-                          seed={state.mockSeed}
-                          locale={state.locale}
+                          endpoint={selected}
+                          seed={mockSeed}
+                          locale={locale}
                           mockResponse={
-                            state.mocks.find(
-                              (mockMap) =>
-                                state.selected &&
-                                mockMap.mocks[state.selected.path]?.[state.selected.method],
-                            )?.mocks[state.selected.path]?.[state.selected.method]
+                            mocks.find((mockMap) => mockMap.mocks[selected.path]?.[selected.method])
+                              ?.mocks[selected.path]?.[selected.method]
                           }
                           onSave={saveMock}
                         />
@@ -194,7 +151,7 @@ export function App(): ReactElement {
                 ) : (
                   <Empty
                     description={
-                      state.specs.length > 0
+                      specs.length > 0
                         ? 'These specifications have no supported HTTP operations.'
                         : 'Add an OpenAPI specification to start mocking.'
                     }
@@ -204,7 +161,7 @@ export function App(): ReactElement {
             {
               key: 'log',
               label: 'Request log',
-              children: <RequestLog entries={state.requestLog} />,
+              children: <RequestLog entries={requestLog} />,
             },
             {
               key: 'settings',
@@ -212,35 +169,21 @@ export function App(): ReactElement {
               children: (
                 <Space direction="vertical" size="large" className="settings-panel">
                   <ServerControls
-                    hasSpecification={state.specs.length > 0}
-                    status={state.serverStatus}
-                    onStatusChange={(serverStatus) =>
-                      setState((current) => ({ ...current, serverStatus, error: undefined }))
-                    }
+                    hasSpecification={specs.length > 0}
+                    status={serverStatus}
+                    onStatusChange={setServerStatus}
                   />
                   <GenerationControls
-                    seed={state.mockSeed}
-                    locale={state.locale}
+                    seed={mockSeed}
+                    locale={locale}
                     onSave={saveMockSeed}
                     onSaveLocale={saveAppLocale}
                   />
-                  <MockTransfer
-                    hasSpecification={state.specs.length > 0}
-                    onImported={(mocks) =>
-                      setState((current) => ({
-                        ...current,
-                        mocks: [
-                          ...current.mocks.filter((mockMap) => mockMap.specPath !== mocks.specPath),
-                          mocks,
-                        ],
-                        error: undefined,
-                      }))
-                    }
-                  />
-                  {state.specs.length > 0 ? (
+                  <MockTransfer hasSpecification={specs.length > 0} onImported={replaceMock} />
+                  {specs.length > 0 ? (
                     <Space direction="vertical" size={0}>
                       <Typography.Text strong>Loaded specifications</Typography.Text>
-                      {state.specs.map((spec) => (
+                      {specs.map((spec) => (
                         <Typography.Text key={spec.path} type="secondary">
                           {spec.path}
                         </Typography.Text>
