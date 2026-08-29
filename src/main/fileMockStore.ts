@@ -24,7 +24,7 @@ export class FileMockStore implements MockStore {
 
   async load(): Promise<MockMap | undefined> {
     try {
-      return await readMockMapFile(this.filePath);
+      return await readMockStoreFile(this.filePath);
     } catch (error: unknown) {
       if (isMissingFileError(error)) {
         return undefined;
@@ -35,7 +35,7 @@ export class FileMockStore implements MockStore {
 
   async save(mockMap: MockMap): Promise<void> {
     try {
-      await writeMockMapFile(this.filePath, mockMap);
+      await writeMockStoreFile(this.filePath, mockMap);
     } catch {
       throw new MockStoreError('Unable to save the mock responses.');
     }
@@ -77,8 +77,7 @@ export class FileMockStore implements MockStore {
   }
 }
 
-/** Reads and validates a MockMap selected through a main-process file dialog. */
-export async function readMockMapFile(filePath: string): Promise<MockMap> {
+async function readMockStoreFile(filePath: string): Promise<MockMap> {
   try {
     return parseMockMap(JSON.parse(await readFile(filePath, 'utf8')) as unknown);
   } catch (error: unknown) {
@@ -88,8 +87,7 @@ export async function readMockMapFile(filePath: string): Promise<MockMap> {
   }
 }
 
-/** Atomically writes a validated MockMap to a main-process selected file path. */
-export async function writeMockMapFile(filePath: string, mockMap: MockMap): Promise<void> {
+async function writeMockStoreFile(filePath: string, mockMap: MockMap): Promise<void> {
   const validated = parseMockMap(mockMap);
   const temporaryPath = `${filePath}.tmp`;
 

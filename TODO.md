@@ -111,7 +111,7 @@ This plan is ordered by dependency. Complete higher-priority work before moving 
 - **Priority:** High
 - **Effort:** L
 - **Dependencies:** T011
-- **Affected:** `src/renderer/src/App.tsx`, `src/renderer/src/components/EndpointTable.tsx`, `src/renderer/src/components/ServerControls.tsx`
+- **Affected:** `src/renderer/src/App.tsx`, `src/renderer/src/components/EndpointTable.tsx`, `src/renderer/src/layout/Header.tsx`
 - **Deliverable:** A user can load a spec, inspect all endpoints, and see server state.
 
 ## Phase 2: Mock Editor and Persistence
@@ -131,7 +131,7 @@ This plan is ordered by dependency. Complete higher-priority work before moving 
 - **Priority:** High
 - **Effort:** M
 - **Dependencies:** T010, T011, T012
-- **Affected:** `src/renderer/src/components/ServerControls.tsx`, `src/renderer/src/App.tsx`
+- **Affected:** `src/renderer/src/layout/Header.tsx`, `src/renderer/src/App.tsx`
 - **Deliverable:** Users can control the local server and see its address and current status.
 
 ### [x] T015 - Add mock hot-reload behavior
@@ -142,15 +142,6 @@ This plan is ordered by dependency. Complete higher-priority work before moving 
 - **Dependencies:** T009, T013, T014
 - **Affected:** `src/main/mockServer.ts`, `src/main/fileMockStore.ts`, `src/renderer/src/App.tsx`, `tests/mockServer.test.ts`
 - **Deliverable:** A saved response is returned by the already-running server on the next request.
-
-### [x] T016 - Add import and export of mocks
-
-- **Description:** Implement file dialogs, versioned MockMap JSON validation, export of the active map, import preview/replace behavior, and conflict/error handling.
-- **Priority:** Medium
-- **Effort:** M
-- **Dependencies:** T008, T011, T013
-- **Affected:** `src/main/ipc.ts`, `src/main/fileMockStore.ts`, `src/renderer/src/components/MockTransfer.tsx`, `tests/mockTransfer.test.ts`
-- **Deliverable:** Users can move mock overrides between projects without modifying the OpenAPI source.
 
 ## Phase 3: Enhancements
 

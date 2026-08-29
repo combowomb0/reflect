@@ -1,49 +1,50 @@
-import { Empty, Input, Tag } from 'antd';
+import { Empty, Input, Tag, Typography } from 'antd';
 import { useDeferredValue, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { FC } from 'react';
 
-import type { Endpoint } from '../../../shared/types';
+import type { Endpoint } from '../../../../shared/types';
+import { useAppStore } from '../../store/useAppStore';
+import styles from './RouteSidebar.module.scss';
 
-interface RouteSidebarProps {
-  readonly endpoints: readonly Endpoint[];
-  readonly selected?: Endpoint;
-  readonly onSelect: (endpoint: Endpoint) => void;
-}
-
-/** Returns the concise human-readable name used in the route navigation. */
 export function routeName(endpoint: Endpoint): string {
   return endpoint.summary ?? endpoint.operationId ?? endpoint.path;
 }
 
-/** Filters routes exclusively by their visible route name. */
 export function filterRoutesByName(
   endpoints: readonly Endpoint[],
   query: string,
 ): readonly Endpoint[] {
   const normalizedQuery = query.trim().toLowerCase();
-  return normalizedQuery
-    ? endpoints.filter((endpoint) => routeName(endpoint).toLowerCase().includes(normalizedQuery))
-    : endpoints;
+  if (!normalizedQuery) return endpoints;
+
+  return endpoints.filter((endpoint) =>
+    [routeName(endpoint), endpoint.summary, endpoint.operationId, endpoint.path, endpoint.method]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.toLowerCase().includes(normalizedQuery)),
+  );
 }
 
-/** Keyboard-accessible route navigation for the primary mock editing workspace. */
-export function RouteSidebar({ endpoints, selected, onSelect }: RouteSidebarProps): ReactElement {
+export const RouteSidebar: FC = () => {
+  const endpoints = useAppStore((state) => state.endpoints);
+  const selected = useAppStore((state) => state.selected);
+  const onSelect = useAppStore((state) => state.selectEndpoint);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
+
   const routes = useMemo(
     () => filterRoutesByName(endpoints, deferredQuery),
     [deferredQuery, endpoints],
   );
 
   return (
-    <aside className="route-sidebar" aria-label="Routes">
+    <aside className={styles.sidebar} aria-label="Routes">
       <Input
         allowClear
         placeholder="Search..."
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      <nav className="route-list" aria-label="Available routes">
+      <nav className={styles.list} aria-label="Available routes">
         {routes.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching routes" />
         ) : (
@@ -53,12 +54,14 @@ export function RouteSidebar({ endpoints, selected, onSelect }: RouteSidebarProp
               <button
                 key={endpoint.id}
                 type="button"
-                className={`route-item${isSelected ? ' route-item-selected' : ''}`}
+                className={`${styles.item}${isSelected ? ` ${styles.selected}` : ''}`}
                 aria-current={isSelected ? 'page' : undefined}
                 onClick={() => onSelect(endpoint)}
               >
-                <Tag className="route-method">{endpoint.method}</Tag>
-                <span className="route-path">{endpoint.path}</span>
+                <Tag className={styles.method}>{endpoint.method}</Tag>
+                <Typography.Text ellipsis title={endpoint.path}>
+                  {endpoint.path}
+                </Typography.Text>
               </button>
             );
           })
@@ -66,4 +69,4 @@ export function RouteSidebar({ endpoints, selected, onSelect }: RouteSidebarProp
       </nav>
     </aside>
   );
-}
+};

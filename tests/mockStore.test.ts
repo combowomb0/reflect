@@ -3,12 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import {
-  FileMockStore,
-  MockStoreError,
-  readMockMapFile,
-  writeMockMapFile,
-} from '../src/main/fileMockStore';
+import { FileMockStore, MockStoreError } from '../src/main/fileMockStore';
 
 describe('FileMockStore', () => {
   it('persists and retrieves a route override', async () => {
@@ -43,22 +38,6 @@ describe('FileMockStore', () => {
     await expect(
       store.save({ version: 1, specPath: '', mocks: { invalid: {} } }),
     ).rejects.toBeInstanceOf(MockStoreError);
-  });
-
-  it('exports and imports a versioned mock map', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'reflect-store-'));
-    const filePath = join(directory, 'shared-mocks.json');
-    const mockMap = {
-      version: 1 as const,
-      specPath: '/tmp/source-openapi.yaml',
-      mocks: {
-        '/pets': { GET: { status: 200, headers: { 'x-fixture': 'shared' }, body: [] } },
-      },
-    };
-
-    await writeMockMapFile(filePath, mockMap);
-
-    await expect(readMockMapFile(filePath)).resolves.toEqual(mockMap);
   });
 
   it('backs up a corrupt mock file before recovery', async () => {

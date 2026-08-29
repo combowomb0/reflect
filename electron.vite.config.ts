@@ -1,8 +1,9 @@
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import reactCompiler from 'babel-plugin-react-compiler';
 
 export default defineConfig({
-  main: { plugins: [externalizeDepsPlugin()] },
-  preload: { plugins: [externalizeDepsPlugin()] },
-  renderer: { plugins: [react()] },
+  main: { build: { externalizeDeps: true } },
+  preload: { build: { externalizeDeps: true } },
+  renderer: { plugins: [react({ babel: { plugins: [reactCompiler] } })] },
 });

@@ -1,0 +1,20 @@
+.header {
+  height: auto;
+  min-height: 72px;
+  line-height: normal;
+  background: rgb(255 255 255 / 92%);
+  border-bottom: 1px solid #dce5f0;
+
+  &_content {
+    width: min(1440px, 100%);
+    padding: 12px clamp(16px, 4vw, 32px);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  & :global(.ant-typography) {
+    margin: 0;
+  }
+}

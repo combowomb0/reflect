@@ -1,0 +1,16 @@
+:root {
+  color: #172033;
+  background: #eef3f9;
+}
+
+body {
+  margin: 0;
+}
+
+.ant-layout-header {
+  padding: 0;
+}
+
+.ant-tabs-top > .ant-tabs-nav::before {
+  border-bottom: none;
+}

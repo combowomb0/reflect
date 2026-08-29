@@ -2,13 +2,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { app, dialog, ipcMain } from 'electron';
 
-import {
-  FileMockStore,
-  MockStoreError,
-  type MockStore,
-  readMockMapFile,
-  writeMockMapFile,
-} from './fileMockStore';
+import { FileMockStore, MockStoreError, type MockStore } from './fileMockStore';
 import { createMockApp, MockServer } from './mockServer';
 import { OpenApiParseError, parseOpenAPIFile } from './parser';
 import { collectSpecificationFiles } from './specFiles';
@@ -20,16 +14,12 @@ import type {
   Endpoint,
   LoadedSpec,
   LoadedWorkspace,
-  MockImportPreview,
   MockMap,
   Result,
   ServerStatus,
 } from '../shared/types';
 
-let activeSpec: LoadedSpec | undefined;
-let activeStore: FileMockStore | undefined;
 const activeSpecs = new Map<string, { readonly spec: LoadedSpec; readonly store: FileMockStore }>();
-let pendingImport: MockMap | undefined;
 const mockServer = new MockServer();
 const settingsStore = new FileSettingsStore(join(app.getPath('userData'), 'settings.json'));
 
@@ -44,7 +34,7 @@ export function registerIpcHandlers(): void {
         );
       }
       const selection = await dialog.showOpenDialog({
-        properties: ['openFile', 'openDirectory', 'multiSelections'],
+        properties: ['multiSelections'],
         filters: [{ name: 'OpenAPI', extensions: ['yaml', 'yml', 'json'] }],
       });
       if (selection.canceled || selection.filePaths.length === 0) {
@@ -84,13 +74,10 @@ export function registerIpcHandlers(): void {
           store: await initializeMockStore(spec, settings.mockSeed, settings.locale),
         })),
       );
-      pendingImport = undefined;
       for (const context of contexts) {
         activeSpecs.set(context.spec.path, context);
       }
       const lastContext = contexts.at(-1)!;
-      activeSpec = lastContext.spec;
-      activeStore = lastContext.store;
       await settingsStore.save({ ...settings, lastSpecPath: lastContext.spec.path });
       return {
         ok: true,
@@ -155,24 +142,19 @@ export function registerIpcHandlers(): void {
       return failure(error);
     }
   });
-  ipcMain.handle('settings:save-mock-seed', async (_event, seed: unknown) => {
+  ipcMain.handle('settings:save', async (_event, value: unknown) => {
     try {
+      if (!isRecord(value)) throw new Error('Settings must be an object.');
       const settings = await settingsStore.load();
-      const mockSeed = validateMockSeed(seed);
       const updated = {
         ...settings,
-        ...(mockSeed === undefined ? { mockSeed: undefined } : { mockSeed }),
+        port: validatePort(value.port),
+        ...(value.mockSeed === undefined
+          ? { mockSeed: undefined }
+          : { mockSeed: validateMockSeed(value.mockSeed) }),
+        locale: validateAppLocale(value.locale),
       };
       await settingsStore.save(updated);
-      return { ok: true, value: await settingsStore.load() };
-    } catch (error: unknown) {
-      return failure(error);
-    }
-  });
-  ipcMain.handle('settings:save-app-locale', async (_event, locale: unknown) => {
-    try {
-      const settings = await settingsStore.load();
-      await settingsStore.save({ ...settings, locale: validateAppLocale(locale) });
       return { ok: true, value: await settingsStore.load() };
     } catch (error: unknown) {
       return failure(error);
@@ -213,59 +195,6 @@ export function registerIpcHandlers(): void {
           context.spec.path,
         ),
       };
-    } catch (error: unknown) {
-      return failure(error);
-    }
-  });
-  ipcMain.handle(
-    'mocks:import-preview',
-    async (): Promise<Result<MockImportPreview | undefined>> => {
-      try {
-        if (!activeSpec) throw new Error('Open an API specification before importing mocks.');
-        const selection = await dialog.showOpenDialog({
-          properties: ['openFile'],
-          filters: [{ name: 'Reflect mocks', extensions: ['json'] }],
-        });
-        if (selection.canceled || !selection.filePaths[0]) return { ok: true, value: undefined };
-
-        const imported = await readMockMapFile(selection.filePaths[0]);
-        validateImportedRoutes(imported, activeSpec);
-        pendingImport = imported;
-        return { ok: true, value: summarizeImport(imported) };
-      } catch (error: unknown) {
-        return failure(error);
-      }
-    },
-  );
-  ipcMain.handle('mocks:import', async (): Promise<Result<MockMap>> => {
-    try {
-      if (!activeSpec || !activeStore) {
-        throw new Error('Open an API specification before importing mocks.');
-      }
-      if (!pendingImport) {
-        throw new Error('Select a mock file and review its contents before importing.');
-      }
-      const imported: MockMap = { ...pendingImport, specPath: activeSpec.path };
-      await activeStore.save(imported);
-      pendingImport = undefined;
-      return { ok: true, value: imported };
-    } catch (error: unknown) {
-      return failure(error);
-    }
-  });
-  ipcMain.handle('mocks:export', async (): Promise<Result<string | undefined>> => {
-    try {
-      if (!activeStore) throw new Error('Open an API specification before exporting mocks.');
-      const mockMap = await activeStore.load();
-      if (!mockMap) throw new Error('There are no mock responses to export.');
-      const selection = await dialog.showSaveDialog({
-        defaultPath: 'reflect-mocks.json',
-        filters: [{ name: 'Reflect mocks', extensions: ['json'] }],
-      });
-      if (selection.canceled || !selection.filePath) return { ok: true, value: undefined };
-
-      await writeMockMapFile(selection.filePath, mockMap);
-      return { ok: true, value: selection.filePath };
     } catch (error: unknown) {
       return failure(error);
     }
@@ -376,29 +305,8 @@ function getWorkspaceStore(): MockStore {
   };
 }
 
-function validateImportedRoutes(mockMap: MockMap, spec: LoadedSpec): void {
-  const validRoutes = new Set(
-    spec.endpoints.map((endpoint) => `${endpoint.method} ${endpoint.path}`),
-  );
-  for (const [path, methods] of Object.entries(mockMap.mocks)) {
-    if (!methods) continue;
-    for (const method of Object.keys(methods)) {
-      if (!validRoutes.has(`${method} ${path}`)) {
-        throw new Error(
-          'The imported mocks contain routes that are not in the active specification.',
-        );
-      }
-    }
-  }
-}
-
-function summarizeImport(mockMap: MockMap): MockImportPreview {
-  const routes = Object.values(mockMap.mocks);
-  return {
-    sourceSpecPath: mockMap.specPath,
-    routeCount: routes.length,
-    responseCount: routes.reduce((count, methods) => count + Object.keys(methods ?? {}).length, 0),
-  };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function failure(error: unknown): Result<never> {

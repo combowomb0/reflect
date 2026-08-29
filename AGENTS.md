@@ -81,7 +81,7 @@ The current repository is a scaffold. Create the following structure as implemen
 │   │   └── index.ts          # contextBridge and Window API declarations
 │   ├── renderer/src/
 │   │   ├── App.tsx
-│   │   ├── components/       # EndpointTable, MockEditor, ServerControls
+│   │   ├── components/       # EndpointTable, MockEditor
 │   │   ├── hooks/            # Renderer state and IPC hooks
 │   │   └── main.tsx
 │   └── shared/
@@ -170,7 +170,7 @@ Store files belong in Electron's `app.getPath('userData')`, not beside or inside
 
 ## IPC Contract
 
-Use explicit channels and typed methods, for example: `spec:open`, `spec:load`, `mocks:list`, `mocks:save`, `mocks:import`, `mocks:export`, `server:start`, `server:stop`, and `server:status`. The preload API should expose methods such as `openSpec()`, `saveMock(input)`, `startServer(port)`, and `getServerStatus()`, not raw channel names.
+Use explicit channels and typed methods, for example: `spec:open`, `spec:load`, `mocks:list`, `mocks:save`, `server:start`, `server:stop`, and `server:status`. The preload API should expose methods such as `openSpec()`, `saveMock(input)`, `startServer(port)`, and `getServerStatus()`, not raw channel names.
 
 IPC handlers must return structured success/error results, avoid leaking stack traces to the renderer, and reject malformed inputs before filesystem or server work. Keep the API backwards-compatible once released because the preload and renderer are separate compile targets.
 

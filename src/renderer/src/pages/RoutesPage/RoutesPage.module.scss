@@ -1,0 +1,16 @@
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  min-height: 620px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dce5f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgb(20 42 78 / 8%);
+}
+
+.editor {
+  min-width: 0;
+  padding: 24px;
+  overflow-y: auto;
+}

@@ -17,6 +17,7 @@ interface AppStore {
   readonly mocks: readonly MockMap[];
   readonly selected?: Endpoint;
   readonly requestLog: readonly RequestLogEntry[];
+  readonly port: number;
   readonly mockSeed?: number;
   readonly locale: AppLocale;
   readonly error?: string;
@@ -24,7 +25,11 @@ interface AppStore {
   setVersion: (version: string) => void;
   setServerStatus: (status: ServerStatus) => void;
   setRequestLog: (entries: readonly RequestLogEntry[]) => void;
-  setSettings: (settings: { readonly mockSeed?: number; readonly locale?: AppLocale }) => void;
+  setSettings: (settings: {
+    readonly mockSeed?: number;
+    readonly locale?: AppLocale;
+    readonly port?: number;
+  }) => void;
   setLoading: (loading: boolean) => void;
   setError: (error?: string) => void;
   loadWorkspace: (workspace: LoadedWorkspace, mocks: readonly MockMap[]) => void;
@@ -39,12 +44,18 @@ export const useAppStore = create<AppStore>((set) => ({
   serverStatus: { state: 'stopped' },
   mocks: [],
   requestLog: [],
+  port: 31247,
   locale: 'en',
   loading: false,
   setVersion: (version) => set({ version }),
   setServerStatus: (serverStatus) => set({ serverStatus, error: undefined }),
   setRequestLog: (requestLog) => set({ requestLog }),
-  setSettings: (settings) => set({ mockSeed: settings.mockSeed, locale: settings.locale ?? 'en' }),
+  setSettings: (settings) =>
+    set({
+      mockSeed: settings.mockSeed,
+      locale: settings.locale ?? 'en',
+      ...(settings.port === undefined ? {} : { port: settings.port }),
+    }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   loadWorkspace: (workspace, mocks) => {

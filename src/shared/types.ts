@@ -92,13 +92,6 @@ export interface SaveMockInput {
   readonly response: MockResponse;
 }
 
-/** Metadata shown before replacing the active mock map with an imported file. */
-export interface MockImportPreview {
-  readonly sourceSpecPath: string;
-  readonly routeCount: number;
-  readonly responseCount: number;
-}
-
 /** A serializable error intended for display in the renderer. */
 export interface AppError {
   readonly code: import('./errors').AppErrorCode;
@@ -118,11 +111,7 @@ export interface ReflectApi {
   getServerStatus(): Promise<Result<ServerStatus>>;
   listRequestLog(): Promise<Result<readonly RequestLogEntry[]>>;
   getSettings(): Promise<Result<Settings>>;
-  saveMockSeed(seed: number | undefined): Promise<Result<Settings>>;
-  saveAppLocale(locale: AppLocale): Promise<Result<Settings>>;
+  saveSettings(settings: Settings): Promise<Result<Settings>>;
   listMocks(): Promise<Result<readonly MockMap[]>>;
   saveMock(input: SaveMockInput): Promise<Result<MockMap>>;
-  previewMockImport(): Promise<Result<MockImportPreview | undefined>>;
-  importMocks(): Promise<Result<MockMap>>;
-  exportMocks(): Promise<Result<string | undefined>>;
 }

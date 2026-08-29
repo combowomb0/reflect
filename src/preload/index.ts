@@ -3,7 +3,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   LoadedWorkspace,
   MockMap,
-  MockImportPreview,
   ReflectApi,
   Result,
   SaveMockInput,
@@ -21,17 +20,11 @@ const reflect: ReflectApi = {
   listRequestLog: () =>
     ipcRenderer.invoke('server:request-log') as Promise<Result<readonly RequestLogEntry[]>>,
   getSettings: () => ipcRenderer.invoke('settings:get') as Promise<Result<Settings>>,
-  saveMockSeed: (seed) =>
-    ipcRenderer.invoke('settings:save-mock-seed', seed) as Promise<Result<Settings>>,
-  saveAppLocale: (locale) =>
-    ipcRenderer.invoke('settings:save-app-locale', locale) as Promise<Result<Settings>>,
+  saveSettings: (settings: Settings) =>
+    ipcRenderer.invoke('settings:save', settings) as Promise<Result<Settings>>,
   listMocks: () => ipcRenderer.invoke('mocks:list') as Promise<Result<readonly MockMap[]>>,
   saveMock: (input: SaveMockInput) =>
     ipcRenderer.invoke('mocks:save', input) as Promise<Result<MockMap>>,
-  previewMockImport: () =>
-    ipcRenderer.invoke('mocks:import-preview') as Promise<Result<MockImportPreview | undefined>>,
-  importMocks: () => ipcRenderer.invoke('mocks:import') as Promise<Result<MockMap>>,
-  exportMocks: () => ipcRenderer.invoke('mocks:export') as Promise<Result<string | undefined>>,
 };
 
 contextBridge.exposeInMainWorld('reflect', reflect);

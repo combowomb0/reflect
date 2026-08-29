@@ -7,8 +7,8 @@ let mainWindow: BrowserWindow | null = null;
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1600,
+    height: 900,
     minWidth: 900,
     minHeight: 600,
     show: false,
