@@ -1,0 +1,33 @@
+openapi: 3.0.3
+info:
+  title: Pets API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      tags: [pets]
+      responses:
+        '200':
+          description: Pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id]
+                  properties:
+                    id:
+                      type: string
+                      example: pet-1
+    post:
+      responses:
+        '201':
+          description: Created
+  /pets/{petId}:
+    get:
+      responses:
+        '200':
+          description: Pet
