@@ -1,4 +1,15 @@
-import { Alert, Button, Card, Col, Flex, Form, InputNumber, Row, Select, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  Flex,
+  Form,
+  InputNumber,
+  Modal,
+  Select,
+  Typography,
+} from 'antd';
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 
@@ -16,8 +27,11 @@ export const SettingsPage: FC = () => {
   const mockSeed = useAppStore((state) => state.mockSeed);
   const locale = useAppStore((state) => state.locale);
   const setSettings = useAppStore((state) => state.setSettings);
+  const replaceMocks = useAppStore((state) => state.replaceMocks);
+  const [modal, contextHolder] = Modal.useModal();
   const [form] = Form.useForm<SettingsFormValues>();
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -36,10 +50,30 @@ export const SettingsPage: FC = () => {
     setSaving(false);
   }
 
+  async function regenerateMocks(): Promise<void> {
+    const confirmed = await modal.confirm({
+      title: 'Regenerate all mocks?',
+      content: 'All manually saved mock responses for loaded specifications will be replaced.',
+      okText: 'Regenerate',
+    });
+
+    if (!confirmed) return;
+
+    setRegenerating(true);
+    setError(undefined);
+    const result = await window.reflect.regenerateMocks();
+    if (result.ok) {
+      replaceMocks(result.value);
+    } else {
+      setError(result.error.message);
+    }
+    setRegenerating(false);
+  }
+
   return (
-    <Row gutter={16}>
-      <Col span="10">
-        <Card>
+    <Flex gap="medium">
+      <Flex flex="0.5" vertical gap="medium">
+        <Card title="Settings">
           <Form
             form={form}
             layout="horizontal"
@@ -77,12 +111,27 @@ export const SettingsPage: FC = () => {
               </Button>
             </Form.Item>
             {error ? <Alert title={error} type="error" showIcon /> : null}
+            {contextHolder}
           </Form>
         </Card>
-      </Col>
-      {!!specs.length && (
-        <Col span="14">
-          <Card title="Loaded specifications">
+        <Card title="Mock data">
+          <Typography.Paragraph type="secondary">
+            Replace all saved mock responses for loaded specifications using the current generation
+            settings.
+          </Typography.Paragraph>
+          <Button
+            danger
+            loading={regenerating}
+            disabled={!specs.length}
+            onClick={() => void regenerateMocks()}
+          >
+            Regenerate mocks
+          </Button>
+        </Card>
+      </Flex>
+      <Flex flex="0.5" vertical gap="medium">
+        <Card title="Loaded specifications">
+          {specs.length ? (
             <Flex vertical gap="small">
               {specs.map((spec) => (
                 <Typography.Text key={spec.path} type="secondary">
@@ -90,9 +139,14 @@ export const SettingsPage: FC = () => {
                 </Typography.Text>
               ))}
             </Flex>
-          </Card>
-        </Col>
-      )}
-    </Row>
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="Import an OpenAPI specification to get started"
+            />
+          )}
+        </Card>
+      </Flex>
+    </Flex>
   );
 };

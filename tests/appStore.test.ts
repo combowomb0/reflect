@@ -25,4 +25,18 @@ describe('renderer app store', () => {
     expect(useAppStore.getState().selected).toEqual(endpoint);
     expect(useAppStore.getState().mocks).toEqual([updatedMap]);
   });
+
+  it('replaces all mock maps after bulk regeneration', () => {
+    const originalMap = { version: 1 as const, specPath: '/tmp/pets.yaml', mocks: {} };
+    const regeneratedMap = {
+      version: 1 as const,
+      specPath: '/tmp/pets.yaml',
+      mocks: { '/pets': { GET: { status: 200, headers: {}, body: [{ id: 'pet-1' }] } } },
+    };
+
+    useAppStore.getState().replaceMocks([originalMap]);
+    useAppStore.getState().replaceMocks([regeneratedMap]);
+
+    expect(useAppStore.getState().mocks).toEqual([regeneratedMap]);
+  });
 });

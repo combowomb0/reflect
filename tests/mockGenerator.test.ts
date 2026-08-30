@@ -28,6 +28,25 @@ describe('generateMock', () => {
     expect((value as { items: unknown[] }).items.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('infers an object when a dereferenced schema provides properties without a type', () => {
+    expect(
+      generateMock({
+        type: 'object',
+        properties: {
+          badge: {
+            required: ['title'],
+            properties: {
+              title: { type: 'string' },
+              color: { type: 'string', enum: ['blue', 'red'] },
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
+      badge: { title: expect.any(String), color: expect.stringMatching(/blue|red/) },
+    });
+  });
+
   it('honors numeric and string constraints', () => {
     const number = generateMock({ type: 'integer', minimum: 7, maximum: 7 });
     const string = generateMock({ type: 'string', minLength: 4, maxLength: 4 });
@@ -152,6 +171,17 @@ describe('generateMock', () => {
     );
 
     expect(value).toMatchObject({ fullName: expect.stringMatching(/[А-Яа-яЁё]/) });
+  });
+
+  it('falls back to English Faker data unavailable in the Russian locale', () => {
+    expect(
+      generateMockWithOptions(
+        { type: 'object', properties: { title: { type: 'string' } } },
+        { locale: 'ru', seed: 42 },
+      ),
+    ).toMatchObject(
+      { title: expect.any(String) },
+    );
   });
 
   it('generates a random useful array length within schema constraints', () => {

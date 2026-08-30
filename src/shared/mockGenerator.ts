@@ -92,9 +92,10 @@ function defaultContext(): GenerationContext {
 }
 
 function createContext(options: MockGenerationOptions): GenerationContext {
-  const locale = options.locale === 'ru' ? ru : en;
   const seededFaker =
-    options.seed === undefined && options.locale !== 'ru' ? faker : new Faker({ locale: [locale] });
+    options.seed === undefined && options.locale !== 'ru'
+      ? faker
+      : new Faker({ locale: options.locale === 'ru' ? [ru, en] : [en] });
   if (options.seed !== undefined) seededFaker.seed(options.seed);
 
   return {
@@ -163,7 +164,7 @@ function generateValue(
     case 'string':
       return generateString(normalized, fieldName, context);
     default:
-      return null;
+      return isRecord(normalized.properties) ? generateObject(normalized, depth, context) : null;
   }
 }
 

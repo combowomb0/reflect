@@ -21,4 +21,12 @@ describe('specification file selection', () => {
       rootSpec,
     ]);
   });
+
+  it('recognizes YAML extensions regardless of filename casing', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'reflect-spec-files-'));
+    const yamlSpec = join(directory, 'openapi.YAML');
+    await writeFile(yamlSpec, 'openapi: 3.0.3', 'utf8');
+
+    await expect(collectSpecificationFiles([yamlSpec])).resolves.toEqual([yamlSpec]);
+  });
 });

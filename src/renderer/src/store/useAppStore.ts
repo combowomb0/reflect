@@ -35,6 +35,7 @@ interface AppStore {
   loadWorkspace: (workspace: LoadedWorkspace, mocks: readonly MockMap[]) => void;
   selectEndpoint: (endpoint: Endpoint) => void;
   replaceMock: (mockMap: MockMap) => void;
+  replaceMocks: (mockMaps: readonly MockMap[]) => void;
 }
 
 /** Renderer-only UI state. Main process data remains the persistent source of truth. */
@@ -68,4 +69,5 @@ export const useAppStore = create<AppStore>((set) => ({
       mocks: [...state.mocks.filter((current) => current.specPath !== mockMap.specPath), mockMap],
       error: undefined,
     })),
+  replaceMocks: (mocks) => set({ mocks, error: undefined }),
 }));

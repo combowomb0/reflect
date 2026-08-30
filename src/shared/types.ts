@@ -114,4 +114,5 @@ export interface ReflectApi {
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   listMocks(): Promise<Result<readonly MockMap[]>>;
   saveMock(input: SaveMockInput): Promise<Result<MockMap>>;
+  regenerateMocks(): Promise<Result<readonly MockMap[]>>;
 }

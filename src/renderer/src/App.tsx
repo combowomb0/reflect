@@ -39,7 +39,7 @@ export const App: FC = () => {
     <Layout className={styles.shell}>
       <Header />
       <Layout.Content className={styles.content}>
-        {error ? <Alert title={error} type="error" showIcon /> : null}
+        {error ? <Alert title={error} type="error" showIcon closable /> : null}
         <Tabs
           size="large"
           items={[

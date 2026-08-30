@@ -85,7 +85,7 @@ export const MockEditor: FC = () => {
     setDraft(update);
   }
 
-  function resetToGenerated(): void {
+  function regenerate(): void {
     updateDraft(() => toDraft(createGeneratedResponse(endpoint, seed, locale)));
     setSaveError(undefined);
   }
@@ -167,7 +167,7 @@ export const MockEditor: FC = () => {
             Save mock
           </Button>
           <Button onClick={cancel}>Cancel changes</Button>
-          <Button onClick={resetToGenerated}>Reset to generated</Button>
+          <Button onClick={regenerate}>Regenerate</Button>
         </Space>
       </Flex>
     </div>

@@ -1,5 +1,5 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { access, stat } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 
 import type { Endpoint, HttpMethod } from '../shared/types';
@@ -40,7 +40,10 @@ interface OpenApiDocument {
 
 /** Describes an invalid or unreadable OpenAPI specification without exposing implementation details. */
 export class OpenApiParseError extends DomainError {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly isReusableFragment = false,
+  ) {
     super('SPEC_INVALID', message);
     this.name = 'OpenApiParseError';
   }
@@ -68,9 +71,8 @@ export async function parseOpenAPIFile(filePath: string): Promise<readonly Endpo
       throw new OpenApiParseError('Reflect supports OpenAPI 3.x specifications only.');
     }
 
-    if (!isRecord(document.paths)) {
-      throw new OpenApiParseError('The specification does not contain any paths.');
-    }
+    // A components-only document is a shared dependency, not a mockable API.
+    if (!isRecord(document.paths)) return [];
 
     return normalizeEndpoints(document.paths);
   } catch (error: unknown) {
@@ -78,8 +80,31 @@ export async function parseOpenAPIFile(filePath: string): Promise<readonly Endpo
       throw error;
     }
 
-    throw new OpenApiParseError('Unable to read or validate the OpenAPI specification.');
+    if ((await hasOpenApiVersion(resolvedPath)) === false) {
+      throw new OpenApiParseError('The file is a reusable OpenAPI fragment.', true);
+    }
+
+    throw new OpenApiParseError(
+      `Unable to read or validate the OpenAPI specification: ${getErrorDetail(error)}`,
+    );
   }
+}
+
+async function hasOpenApiVersion(filePath: string): Promise<boolean | undefined> {
+  try {
+    const source = await readFile(filePath, 'utf8');
+    return /^\s*(?:"openapi"|openapi)\s*:/m.test(source) || /"openapi"\s*:/m.test(source);
+  } catch {
+    return undefined;
+  }
+}
+
+function getErrorDetail(error: unknown): string {
+  if (!(error instanceof Error) || !error.message) {
+    return 'The parser did not provide additional details.';
+  }
+
+  return error.message.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
 function validateSpecPath(filePath: string): string {

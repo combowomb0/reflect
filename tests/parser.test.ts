@@ -49,6 +49,39 @@ describe('parseOpenAPIFile', () => {
     );
   });
 
+  it('returns no endpoints for a reusable OpenAPI document without routes', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'reflect-parser-'));
+    const componentsFile = join(directory, 'components.openapi.yaml');
+    await writeFile(
+      componentsFile,
+      [
+        'openapi: 3.0.3',
+        'info:',
+        '  title: Shared components',
+        '  version: 1.0.0',
+        'paths:',
+        'components:',
+        '  schemas:',
+        '    Pet:',
+        '      type: object',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await expect(parseOpenAPIFile(componentsFile)).resolves.toEqual([]);
+  });
+
+  it('marks a shared schema fragment so directory imports can ignore it', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'reflect-parser-'));
+    const fragmentFile = join(directory, 'shared.yaml');
+    await writeFile(fragmentFile, 'Pet:\n  type: object\n', 'utf8');
+
+    await expect(parseOpenAPIFile(fragmentFile)).rejects.toMatchObject({
+      isReusableFragment: true,
+      message: 'The file is a reusable OpenAPI fragment.',
+    });
+  });
+
   it('normalizes a large specification within a practical local load budget', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'reflect-parser-'));
     const filePath = join(directory, 'large.json');

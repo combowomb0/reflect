@@ -25,6 +25,8 @@ const reflect: ReflectApi = {
   listMocks: () => ipcRenderer.invoke('mocks:list') as Promise<Result<readonly MockMap[]>>,
   saveMock: (input: SaveMockInput) =>
     ipcRenderer.invoke('mocks:save', input) as Promise<Result<MockMap>>,
+  regenerateMocks: () =>
+    ipcRenderer.invoke('mocks:regenerate') as Promise<Result<readonly MockMap[]>>,
 };
 
 contextBridge.exposeInMainWorld('reflect', reflect);

@@ -34,7 +34,9 @@ export function registerIpcHandlers(): void {
         );
       }
       const selection = await dialog.showOpenDialog({
-        properties: ['multiSelections'],
+        // Explicitly include both modes because Electron does not guarantee a default
+        // file-selection mode when `properties` is supplied.
+        properties: ['openFile', 'openDirectory', 'multiSelections'],
         filters: [{ name: 'OpenAPI', extensions: ['yaml', 'yml', 'json'] }],
       });
       if (selection.canceled || selection.filePaths.length === 0) {
@@ -53,7 +55,8 @@ export function registerIpcHandlers(): void {
             } catch (error: unknown) {
               if (
                 error instanceof OpenApiParseError &&
-                error.message === 'Reflect supports OpenAPI 3.x specifications only.'
+                (error.isReusableFragment ||
+                  error.message === 'Reflect supports OpenAPI 3.x specifications only.')
               ) {
                 return undefined;
               }
@@ -61,7 +64,7 @@ export function registerIpcHandlers(): void {
             }
           }),
         )
-      ).filter((spec): spec is LoadedSpec => spec !== undefined);
+      ).filter((spec): spec is LoadedSpec => spec !== undefined && spec.endpoints.length > 0);
       if (specs.length === 0) {
         throw new DomainError('SPEC_INVALID', 'No OpenAPI 3.x specifications were found.');
       }
@@ -199,6 +202,27 @@ export function registerIpcHandlers(): void {
       return failure(error);
     }
   });
+  ipcMain.handle('mocks:regenerate', async (): Promise<Result<readonly MockMap[]>> => {
+    try {
+      if (activeSpecs.size === 0) {
+        throw new DomainError(
+          'REQUEST_FAILED',
+          'Open an API specification before regenerating mocks.',
+        );
+      }
+
+      const settings = await settingsStore.load();
+      const mockMaps = [...activeSpecs.values()].map(({ spec }) =>
+        createInitialMockMap(spec.path, spec.endpoints, settings.mockSeed, settings.locale),
+      );
+      await Promise.all(
+        [...activeSpecs.values()].map((context, index) => context.store.save(mockMaps[index]!)),
+      );
+      return { ok: true, value: mockMaps };
+    } catch (error: unknown) {
+      return failure(error);
+    }
+  });
 }
 
 function createInitialMockMap(
@@ -310,5 +334,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function failure(error: unknown): Result<never> {
+  if (error instanceof DomainError) {
+    return { ok: false, error: toAppError(error) };
+  }
+  if (error instanceof Error && error.message) {
+    return {
+      ok: false,
+      error: {
+        code: 'REQUEST_FAILED',
+        message: `The requested action could not be completed: ${error.message.replace(/\s+/g, ' ').slice(0, 500)}`,
+      },
+    };
+  }
   return { ok: false, error: toAppError(error) };
 }
