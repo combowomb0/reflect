@@ -1,4 +1,4 @@
-import { Alert, Button, Divider, Flex, Input, InputNumber, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Divider, Flex, Form, Input, InputNumber, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 
@@ -8,16 +8,12 @@ import type { AppLocale, Endpoint, MockResponse } from '../../../../shared/types
 import { useAppStore } from '../../store/useAppStore';
 import styles from './MockEditor.module.scss';
 
-interface DraftResponse {
+interface MockEditorForm {
   readonly status: number | null;
   readonly headers: string;
   readonly body: string;
   readonly variants: string;
 }
-
-type DraftValidation =
-  | { readonly ok: true; readonly value: MockResponse }
-  | { readonly ok: false; readonly error: string };
 
 export const MockEditor: FC = () => {
   const endpoint = useAppStore((state) => state.selected)!;
@@ -30,147 +26,122 @@ export const MockEditor: FC = () => {
   const seed = useAppStore((state) => state.mockSeed);
   const locale = useAppStore((state) => state.locale);
   const replaceMock = useAppStore((state) => state.replaceMock);
+  const [form] = Form.useForm<MockEditorForm>();
+  const values = Form.useWatch([], form);
   const [saveError, setSaveError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const [submittable, setSubmittable] = useState(false);
 
-  async function onSave(response: MockResponse): Promise<string | undefined> {
+  useEffect(() => {
+    form
+      .validateFields({ validateOnly: true })
+      .then(() => setSubmittable(true))
+      .catch(() => setSubmittable(false));
+  }, [form, values]);
+
+  useEffect(() => {
+    const nextDraft = toDraft(mockResponse ?? createGeneratedResponse(endpoint, seed, locale));
+    form.setFieldsValue(nextDraft);
+    setSaveError(undefined);
+  }, [endpoint, form, locale, mockResponse, seed]);
+
+  async function save(values: MockEditorForm): Promise<void> {
+    let response: MockResponse;
+    try {
+      response = toResponse(values);
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : 'Enter a valid mock response.');
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(undefined);
     const result = await window.reflect.saveMock({
       path: endpoint.path,
       method: endpoint.method,
       response,
     });
-    if (!result.ok) return result.error.message;
+    if (!result.ok) {
+      setSaveError(result.error.message);
+      setSaving(false);
+      return;
+    }
     replaceMock(result.value);
-    return undefined;
-  }
-
-  const [draft, setDraft] = useState<DraftResponse>(() =>
-    toDraft(mockResponse ?? createGeneratedResponse(endpoint, seed, locale)),
-  );
-  const [original, setOriginal] = useState<DraftResponse>(() => ({ ...draft }));
-  const [validation, setValidation] = useState<DraftValidation>(() => parseDraft(draft));
-  const [validationPending, setValidationPending] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const nextDraft = toDraft(mockResponse ?? createGeneratedResponse(endpoint, seed, locale));
-    setValidationPending(true);
-    setDraft(nextDraft);
-    setOriginal(nextDraft);
-    setSaveError(undefined);
-  }, [endpoint, mockResponse, seed, locale]);
-
-  useEffect(() => {
-    setValidationPending(true);
-    const timeout = window.setTimeout(() => {
-      setValidation(parseDraft(draft));
-      setValidationPending(false);
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [draft]);
-
-  const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(original);
-
-  async function save(): Promise<void> {
-    if (!validation.ok || validationPending) return;
-
-    setSaving(true);
-    setSaveError(undefined);
-    const error = await onSave(validation.value);
     setSaving(false);
-    setSaveError(error);
-  }
-
-  function updateDraft(update: (current: DraftResponse) => DraftResponse): void {
-    setValidationPending(true);
-    setDraft(update);
   }
 
   function regenerate(): void {
-    updateDraft(() => toDraft(createGeneratedResponse(endpoint, seed, locale)));
+    form.setFieldsValue(toDraft(createGeneratedResponse(endpoint, seed, locale)));
     setSaveError(undefined);
   }
 
   function cancel(): void {
-    updateDraft(() => toDraft(mockResponse ?? createGeneratedResponse(endpoint, seed, locale)));
+    const nextDraft = toDraft(mockResponse ?? createGeneratedResponse(endpoint, seed, locale));
+    form.setFieldsValue(nextDraft);
     setSaveError(undefined);
   }
 
   return (
-    <div className={styles.editor} aria-label="Mock response editor">
+    <Flex flex="auto" vertical>
       <Flex align="center" gap="small">
         <Tag>{endpoint.method}</Tag>
         <Typography.Title level={5} style={{ margin: 0 }}>
           {endpoint.path}
         </Typography.Title>
-        {hasUnsavedChanges ? <Tag color="warning">Unsaved changes</Tag> : null}
       </Flex>
       <Divider size="medium" />
-      <Flex vertical gap="middle" className={styles.stack}>
-        <Space wrap>
-          <Typography.Text>Status code</Typography.Text>
-          <InputNumber
-            min={100}
-            max={599}
-            aria-label="Response status code"
-            value={draft.status}
-            onChange={(status) => updateDraft((current) => ({ ...current, status }))}
-          />
-        </Space>
-        <label className={styles.field}>
-          <Typography.Text>Headers (JSON)</Typography.Text>
-          <Input.TextArea
-            aria-label="Response headers"
-            rows={1}
-            value={draft.headers}
-            onChange={(event) =>
-              updateDraft((current) => ({ ...current, headers: event.target.value }))
-            }
-          />
-        </label>
-        <div className={styles.field}>
-          <Typography.Text>Response body (JSON)</Typography.Text>
-          <Input.TextArea
-            aria-label="Response body"
-            rows={12}
-            value={draft.body}
-            onChange={(event) =>
-              updateDraft((current) => ({ ...current, body: event.target.value }))
-            }
-          />
-        </div>
-        <label className={styles.field}>
-          <Typography.Text>Conditional variants (JSON)</Typography.Text>
-          <Input.TextArea
-            aria-label="Conditional response variants"
-            rows={4}
-            placeholder={
-              '[{"id":"missing","priority":100,"match":{"pathParams":{"id":"missing"}},"response":{"status":404,"headers":{},"body":null}}]'
-            }
-            value={draft.variants}
-            onChange={(event) =>
-              updateDraft((current) => ({ ...current, variants: event.target.value }))
-            }
-          />
-          <Typography.Text type="secondary">
-            Highest priority matching variant wins. Match query, headers, body, or pathParams.
-          </Typography.Text>
-        </label>
-        {!validation.ok ? <Alert title={validation.error} type="error" showIcon /> : null}
-        {saveError ? <Alert title={saveError} type="error" showIcon /> : null}
-        <Space wrap>
-          <Button
-            type="primary"
-            disabled={!validation.ok || validationPending}
-            loading={saving}
-            onClick={() => void save()}
-          >
-            Save mock
-          </Button>
-          <Button onClick={cancel}>Cancel changes</Button>
-          <Button onClick={regenerate}>Regenerate</Button>
-        </Space>
-      </Flex>
-    </div>
+      <Form
+        form={form}
+        className={styles.editor}
+        layout="vertical"
+        onFinish={(values) => void save(values)}
+        onFinishFailed={() => setSaveError('Fix the validation errors before saving.')}
+      >
+        <Form.Item
+          label="Status code"
+          name="status"
+          rules={[
+            {
+              type: 'number',
+              min: 100,
+              max: 599,
+              message: 'Status code must be between 100 and 599.',
+            },
+          ]}
+        >
+          <InputNumber min={100} max={599} aria-label="Response status code" />
+        </Form.Item>
+        <Form.Item
+          label="Headers (JSON)"
+          name="headers"
+          rules={[jsonRule('Headers', validateHeaders)]}
+        >
+          <Input.TextArea aria-label="Response headers" rows={2} />
+        </Form.Item>
+        <Form.Item label="Response body (JSON)" name="body" rules={[jsonRule('Response body')]}>
+          <Input.TextArea aria-label="Response body" rows={12} />
+        </Form.Item>
+        <Form.Item
+          label="Conditional variants (JSON)"
+          name="variants"
+          extra="Highest priority matching variant wins. Match query, headers, body, or pathParams."
+          rules={[jsonRule('Conditional variants', validateVariants)]}
+        >
+          <Input.TextArea aria-label="Conditional response variants" rows={4} />
+        </Form.Item>
+        <Divider size="middle" />
+        <Flex vertical gap="medium">
+          {saveError ? <Alert title={saveError} type="error" showIcon /> : null}
+          <Flex gap="small">
+            <Button type="primary" htmlType="submit" loading={saving} disabled={!submittable}>
+              Save mock
+            </Button>
+            <Button onClick={cancel}>Cancel changes</Button>
+            <Button onClick={regenerate}>Regenerate</Button>
+          </Flex>
+        </Flex>
+      </Form>
+    </Flex>
   );
 };
 
@@ -200,7 +171,7 @@ function deriveEndpointSeed(seed: number, endpointId: string): number {
   return derived;
 }
 
-function toDraft(response: MockResponse): DraftResponse {
+function toDraft(response: MockResponse): MockEditorForm {
   return {
     status: response.status,
     headers: JSON.stringify(response.headers, null, 2),
@@ -209,20 +180,59 @@ function toDraft(response: MockResponse): DraftResponse {
   };
 }
 
-function parseDraft(draft: DraftResponse): DraftValidation {
+function toResponse(draft: MockEditorForm): MockResponse {
   try {
-    const response: unknown = {
+    const response = {
       status: draft.status,
-      headers: JSON.parse(draft.headers),
-      body: JSON.parse(draft.body),
-      variants: JSON.parse(draft.variants),
+      headers: parseJson(draft.headers, 'Headers'),
+      body: parseJson(draft.body, 'Response body'),
+      variants: parseJson(draft.variants, 'Conditional variants'),
     };
     validateMockResponse(response);
-    return { ok: true, value: response };
+    return response;
   } catch (error: unknown) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Enter a valid JSON mock response.',
-    };
+    throw error instanceof Error ? error : new Error('Enter a valid JSON mock response.');
   }
+}
+
+function parseJson(value: unknown, label: string): unknown {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label} is required and must contain valid JSON.`);
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : 'Unknown JSON syntax error.';
+    throw new Error(`${label} contains invalid JSON: ${detail}`, { cause: error });
+  }
+}
+
+function jsonRule(
+  label: string,
+  validate?: (parsed: unknown) => string | undefined,
+): { validator: (_rule: unknown, value: unknown) => Promise<void> } {
+  return {
+    validator: async (_rule: unknown, value: unknown): Promise<void> => {
+      const parsed = parseJson(value, label);
+      const error = validate?.(parsed);
+      if (error) throw new Error(`${label}: ${error}`);
+    },
+  };
+}
+
+function validateHeaders(parsed: unknown): string | undefined {
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    !Object.values(parsed).every((header) => typeof header === 'string')
+  ) {
+    return 'Headers must be a JSON object with string values.';
+  }
+  return undefined;
+}
+
+function validateVariants(parsed: unknown): string | undefined {
+  return Array.isArray(parsed) ? undefined : 'Conditional variants must be a JSON array.';
 }

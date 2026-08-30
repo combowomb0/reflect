@@ -1,9 +1,11 @@
 .shell {
-  min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(145deg, #eaf3ff, #f7f9fc 55%, #f4efff);
 }
 
 .content {
+  display: flex;
+  flex-direction: column;
   width: min(1440px, 100%);
   margin: 0 auto;
   padding: 12px clamp(16px, 4vw, 32px);

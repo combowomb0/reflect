@@ -1,5 +1,5 @@
 import { Alert, Layout, Tabs } from 'antd';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { RequestLogPage, RoutesPage, SettingsPage } from './pages';
 import { useAppStore } from './store/useAppStore';
@@ -12,6 +12,7 @@ export const App: FC = () => {
   const setServerStatus = useAppStore((state) => state.setServerStatus);
   const setRequestLog = useAppStore((state) => state.setRequestLog);
   const setSettings = useAppStore((state) => state.setSettings);
+  const [activeKey, setActiveKey] = useState('routes');
 
   useEffect(() => {
     void window.reflect.getAppVersion().then((result) => {
@@ -42,24 +43,26 @@ export const App: FC = () => {
         {error ? <Alert title={error} type="error" showIcon closable /> : null}
         <Tabs
           size="large"
+          activeKey={activeKey}
+          onTabClick={setActiveKey}
           items={[
             {
               key: 'routes',
               label: 'Routes',
-              children: <RoutesPage />,
             },
             {
               key: 'log',
               label: 'Request log',
-              children: <RequestLogPage />,
             },
             {
               key: 'settings',
               label: 'Settings',
-              children: <SettingsPage />,
             },
           ]}
         />
+        {activeKey === 'routes' && <RoutesPage />}
+        {activeKey === 'log' && <RequestLogPage />}
+        {activeKey === 'settings' && <SettingsPage />}
       </Layout.Content>
     </Layout>
   );

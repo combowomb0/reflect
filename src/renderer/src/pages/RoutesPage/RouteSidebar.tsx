@@ -6,24 +6,6 @@ import type { Endpoint } from '../../../../shared/types';
 import { useAppStore } from '../../store/useAppStore';
 import styles from './RouteSidebar.module.scss';
 
-export function routeName(endpoint: Endpoint): string {
-  return endpoint.summary ?? endpoint.operationId ?? endpoint.path;
-}
-
-export function filterRoutesByName(
-  endpoints: readonly Endpoint[],
-  query: string,
-): readonly Endpoint[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return endpoints;
-
-  return endpoints.filter((endpoint) =>
-    [routeName(endpoint), endpoint.summary, endpoint.operationId, endpoint.path, endpoint.method]
-      .filter((value): value is string => Boolean(value))
-      .some((value) => value.toLowerCase().includes(normalizedQuery)),
-  );
-}
-
 export const RouteSidebar: FC = () => {
   const endpoints = useAppStore((state) => state.endpoints);
   const selected = useAppStore((state) => state.selected);
@@ -31,10 +13,20 @@ export const RouteSidebar: FC = () => {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
 
-  const routes = useMemo(
-    () => filterRoutesByName(endpoints, deferredQuery),
-    [deferredQuery, endpoints],
-  );
+  const routes = useMemo(() => {
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    if (!normalizedQuery) return endpoints;
+
+    const routeName = (endpoint: Endpoint) => {
+      return endpoint.summary ?? endpoint.operationId ?? endpoint.path;
+    };
+
+    return endpoints.filter((endpoint) =>
+      [routeName(endpoint), endpoint.summary, endpoint.operationId, endpoint.path, endpoint.method]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [deferredQuery, endpoints]);
 
   return (
     <aside className={styles.sidebar} aria-label="Routes">

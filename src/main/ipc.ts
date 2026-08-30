@@ -34,9 +34,10 @@ export function registerIpcHandlers(): void {
         );
       }
       const selection = await dialog.showOpenDialog({
-        // Explicitly include both modes because Electron does not guarantee a default
-        // file-selection mode when `properties` is supplied.
-        properties: ['openFile', 'openDirectory', 'multiSelections'],
+        properties:
+          process.platform === 'darwin'
+            ? ['openFile', 'openDirectory', 'multiSelections']
+            : ['openFile', 'multiSelections'],
         filters: [{ name: 'OpenAPI', extensions: ['yaml', 'yml', 'json'] }],
       });
       if (selection.canceled || selection.filePaths.length === 0) {
